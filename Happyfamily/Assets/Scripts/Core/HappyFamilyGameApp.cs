@@ -28,11 +28,13 @@ namespace HappyFamily.Core
         private TextMeshProUGUI levelStatusText;
         private readonly List<TileButtonView> tileViews = new List<TileButtonView>();
 
+        private HappyFamilyUiTheme Theme => HappyFamilyUiThemeProvider.GetTheme();
+
         private void Awake()
         {
             progressService = new PlayerProgressService();
             saveData = progressService.Load();
-            chapterDefinition = MvpContentFactory.CreateFrontYardChapter();
+            chapterDefinition = MvpContentProvider.GetFrontYardChapter();
         }
 
         private void Start()
@@ -48,7 +50,7 @@ namespace HappyFamily.Core
                 rootCanvas = UiFactory.CreateRootCanvas("HappyFamilyCanvas", transform);
                 screenRoot = UiFactory.CreateScreenRoot(rootCanvas.transform, "ScreenRoot");
                 var viewportFitter = screenRoot.gameObject.AddComponent<MobileViewportFitter>();
-                viewportFitter.Initialize(rootCanvas.GetComponent<RectTransform>(), new Vector2(750f, 1334f), 24f);
+                viewportFitter.Initialize(rootCanvas.GetComponent<RectTransform>(), Theme.ReferenceResolution, Theme.ViewportMargin);
             }
 
             if (EventSystem.current == null)
@@ -68,38 +70,40 @@ namespace HappyFamily.Core
 
             UiFactory.ClearChildren(screenRoot);
 
-            var panel = UiFactory.CreatePanel(screenRoot, "HomePanel", new Color(0.95f, 0.91f, 0.82f, 1f));
-            UiFactory.CreateLabel(panel, "Title", "幸福人家", 58, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(0.29f, 0.19f, 0.13f));
-            UiFactory.CreateLabel(panel, "Subtitle", "MVP 起步闭环：前院整理 -> 幸福星 -> 修院门", 28, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.36f, 0.25f, 0.18f));
+            var shellPrefab = HappyFamilyScreenPrefabProvider.LoadHomeScreenShell();
+            var shell = BuildHomeShell(shellPrefab);
 
-            var progressCard = UiFactory.CreateCard(panel, "ProgressCard", new Color(0.99f, 0.98f, 0.94f, 1f));
-            UiFactory.CreateLabel(progressCard, "ChapterName", chapterDefinition.DisplayName, 42, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.24f, 0.17f, 0.12f));
-            UiFactory.CreateLabel(progressCard, "Stars", $"幸福星：{saveData.TotalStars}", 34, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.33f, 0.25f, 0.18f));
-            UiFactory.CreateLabel(progressCard, "Levels", $"已完成关卡：{saveData.CompletedLevelIds.Count}/{chapterDefinition.Levels.Count}", 30, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.33f, 0.25f, 0.18f));
+            UiFactory.CreateLabel(shell.TitleRoot, "Title", "幸福人家", Theme.HomeTitleSize, FontStyle.Bold, TextAnchor.MiddleCenter, Theme.HeadingText);
+            UiFactory.CreateLabel(shell.TitleRoot, "Subtitle", "MVP 起步闭环：前院整理 -> 幸福星 -> 修院门", Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
+
+            var progressCard = UiFactory.CreateCard(shell.ProgressRoot, "ProgressCard", Theme.CardBackground);
+            UiFactory.CreateLabel(progressCard, "ChapterName", chapterDefinition.DisplayName, Theme.HomeCardTitleSize, FontStyle.Bold, TextAnchor.MiddleLeft, Theme.HeadingText);
+            UiFactory.CreateLabel(progressCard, "Stars", $"幸福星：{saveData.TotalStars}", Theme.HomeBodySize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
+            UiFactory.CreateLabel(progressCard, "Levels", $"已完成关卡：{saveData.CompletedLevelIds.Count}/{chapterDefinition.Levels.Count}", Theme.HomeBodySize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
 
             var nextLevel = GetNextLevel();
             var mainButtonText = nextLevel != null ? (saveData.CompletedLevelIds.Count == 0 ? PrimaryButtonText : ContinueButtonText) : "已完成当前 Slice";
-            var mainButton = UiFactory.CreateButton(panel, "StartButton", mainButtonText, OnPrimaryButtonClicked, new Color(0.73f, 0.35f, 0.18f, 1f), 108);
+            var mainButton = UiFactory.CreateButton(shell.ActionRoot, "StartButton", mainButtonText, OnPrimaryButtonClicked, Theme.PrimaryButton, 108);
             mainButton.interactable = nextLevel != null;
 
             foreach (var node in chapterDefinition.RenovationNodes)
             {
-                RenderRenovationNode(panel, node);
+                RenderRenovationNode(shell.ProgressRoot, node);
             }
 
-            UiFactory.CreateButton(panel, "ResetButton", ResetButtonText, ResetProgress, new Color(0.50f, 0.54f, 0.56f, 1f), 92);
+            UiFactory.CreateButton(shell.ActionRoot, "ResetButton", ResetButtonText, ResetProgress, Theme.NeutralButton, 92);
         }
 
         private void RenderRenovationNode(RectTransform parent, MvpRenovationNodeDefinition nodeDefinition)
         {
-            var nodeCard = UiFactory.CreateCard(parent, $"{nodeDefinition.Id}Card", new Color(0.99f, 0.97f, 0.90f, 1f));
-            UiFactory.CreateLabel(nodeCard, "NodeTitle", nodeDefinition.DisplayName, 38, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.28f, 0.19f, 0.13f));
+            var nodeCard = UiFactory.CreateCard(parent, $"{nodeDefinition.Id}Card", Theme.CardBackground);
+            UiFactory.CreateLabel(nodeCard, "NodeTitle", nodeDefinition.DisplayName, 38, FontStyle.Bold, TextAnchor.MiddleLeft, Theme.HeadingText);
 
             var unlocked = saveData.TotalStars >= nodeDefinition.RequiredStars;
             var statusText = unlocked
                 ? $"已解锁，可以开始这个焕新节点。"
                 : $"解锁条件：累计获得 {nodeDefinition.RequiredStars} 颗幸福星。";
-            UiFactory.CreateLabel(nodeCard, "NodeStatus", statusText, 28, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.35f, 0.26f, 0.19f));
+            UiFactory.CreateLabel(nodeCard, "NodeStatus", statusText, Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
 
             if (!unlocked)
             {
@@ -108,11 +112,11 @@ namespace HappyFamily.Core
 
             if (!saveData.TryGetRenovationSelection(nodeDefinition.Id, out var selectedOptionId))
             {
-                UiFactory.CreateLabel(nodeCard, "ChooseHint", "选择一个院门样式，完成前院第一步焕新。", 28, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.35f, 0.26f, 0.19f));
+                UiFactory.CreateLabel(nodeCard, "ChooseHint", "选择一个院门样式，完成前院第一步焕新。", Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
                 foreach (var option in nodeDefinition.Options)
                 {
                     var optionText = $"{option.DisplayName} · {option.Description}";
-                    UiFactory.CreateButton(nodeCard, option.Id, optionText, () => SelectRenovationOption(nodeDefinition, option), new Color(0.42f, 0.58f, 0.32f, 1f), 94);
+                    UiFactory.CreateButton(nodeCard, option.Id, optionText, () => SelectRenovationOption(nodeDefinition, option), Theme.SecondaryButton, 94);
                 }
 
                 return;
@@ -121,13 +125,13 @@ namespace HappyFamily.Core
             var selectedOption = nodeDefinition.GetOption(selectedOptionId);
             if (selectedOption == null)
             {
-                UiFactory.CreateLabel(nodeCard, "SelectionError", "装修选择状态异常，请重置进度。", 26, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.55f, 0.22f, 0.18f));
+                UiFactory.CreateLabel(nodeCard, "SelectionError", "装修选择状态异常，请重置进度。", 26, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
                 return;
             }
 
-            UiFactory.CreateLabel(nodeCard, "SelectedLabel", $"当前方案：{selectedOption.DisplayName}", 30, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.42f, 0.31f, 0.18f));
-            UiFactory.CreateLabel(nodeCard, "MemoryTitle", $"回忆卡片：{nodeDefinition.MemoryTitle}", 28, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.42f, 0.31f, 0.18f));
-            UiFactory.CreateLabel(nodeCard, "MemoryText", nodeDefinition.MemoryText, 26, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.33f, 0.25f, 0.18f), 120);
+            UiFactory.CreateLabel(nodeCard, "SelectedLabel", $"当前方案：{selectedOption.DisplayName}", Theme.HomeBodySize, FontStyle.Bold, TextAnchor.MiddleLeft, Theme.HeadingText);
+            UiFactory.CreateLabel(nodeCard, "MemoryTitle", $"回忆卡片：{nodeDefinition.MemoryTitle}", Theme.HomeSubtitleSize, FontStyle.Bold, TextAnchor.MiddleLeft, Theme.HeadingText);
+            UiFactory.CreateLabel(nodeCard, "MemoryText", nodeDefinition.MemoryText, 26, FontStyle.Normal, TextAnchor.UpperLeft, Theme.BodyText, 120);
         }
 
         private void OnPrimaryButtonClicked()
@@ -149,50 +153,33 @@ namespace HappyFamily.Core
             UiFactory.ClearChildren(screenRoot);
             tileViews.Clear();
 
-            var panel = UiFactory.CreateAbsolutePanel(screenRoot, "LevelPanel", new Color(0.88f, 0.93f, 0.88f, 1f));
-            StretchRect(panel, 0f, 0f, 0f, 0f);
+            var shellPrefab = HappyFamilyScreenPrefabProvider.LoadLevelScreenShell();
+            var shell = BuildLevelShell(shellPrefab);
 
-            var headerCard = UiFactory.CreateAbsolutePanel(panel, "HeaderCard", new Color(0.90f, 0.94f, 0.89f, 1f));
-            SetTopRect(headerCard, 24f, 24f, 24f, 190f);
-            var headerLayout = headerCard.gameObject.AddComponent<VerticalLayoutGroup>();
-            headerLayout.padding = new RectOffset(28, 28, 22, 18);
-            headerLayout.spacing = 8;
-            headerLayout.childAlignment = TextAnchor.UpperCenter;
-            headerLayout.childControlHeight = false;
-            headerLayout.childForceExpandHeight = false;
-            headerLayout.childControlWidth = true;
-            headerLayout.childForceExpandWidth = true;
+            UiFactory.CreateLabel(shell.HeaderRoot, "LevelTitle", levelDefinition.DisplayName, Theme.LevelTitleSize, FontStyle.Bold, TextAnchor.MiddleCenter, Theme.HeadingText);
+            UiFactory.CreateLabel(shell.HeaderRoot, "LevelGoal", levelDefinition.Description, Theme.LevelBodySize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
 
-            UiFactory.CreateLabel(headerCard, "LevelTitle", levelDefinition.DisplayName, 38, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(0.18f, 0.22f, 0.18f));
-            UiFactory.CreateLabel(headerCard, "LevelGoal", levelDefinition.Description, 22, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.29f, 0.34f, 0.29f));
-
-            levelStatusText = UiFactory.CreateLabel(headerCard, "LevelStatus", string.Empty, 22, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.22f, 0.26f, 0.22f));
+            levelStatusText = UiFactory.CreateLabel(shell.HeaderRoot, "LevelStatus", string.Empty, Theme.LevelBodySize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
             RefreshLevelStatus("点两个相同物件即可配对。先完成一次完整闭环。");
 
-            var boardContainer = UiFactory.CreateAbsolutePanel(panel, "BoardContainer", new Color(0.95f, 0.97f, 0.92f, 1f));
-            StretchBetween(boardContainer, 24f, 120f, 24f, 230f);
-
-            var boardWidth = screenRoot.rect.width > 0f ? screenRoot.rect.width - 48f : 702f;
-            var cellWidth = Mathf.Floor((boardWidth - 24f - 32f) / 3f);
+            var boardWidth = screenRoot.rect.width > 0f ? screenRoot.rect.width - Theme.HorizontalPadding * 2f : 702f;
+            var cellWidth = Mathf.Floor((boardWidth - Theme.BoardPadding * 2f - Theme.TileGap * 2f) / 3f);
             var cellHeight = 120f;
-            var boardRoot = UiFactory.CreateGrid(boardContainer, "BoardGrid", 3, new Vector2(cellWidth, cellHeight), new Vector2(16f, 16f), new RectOffset(12, 12, 12, 12));
+            var boardPadding = Mathf.RoundToInt(Theme.BoardPadding);
+            var boardRoot = UiFactory.CreateGrid(shell.BoardRoot, "BoardGrid", 3, new Vector2(cellWidth, cellHeight), new Vector2(Theme.TileGap, Theme.TileGap), new RectOffset(boardPadding, boardPadding, boardPadding, boardPadding));
             StretchRect(boardRoot, 0f, 0f, 0f, 0f);
             for (var index = 0; index < activeBoard.Tiles.Count; index++)
             {
                 var tile = activeBoard.Tiles[index];
-                var tileView = UiFactory.CreateTileButton(boardRoot, $"Tile{index}", tile.DisplayLabel, () => OnTileClicked(index));
+                var capturedIndex = index;
+                var tileView = UiFactory.CreateTileButton(boardRoot, $"Tile{index}", tile.DisplayLabel, () => OnTileClicked(capturedIndex));
                 tileViews.Add(tileView);
             }
 
-            var toolbar = UiFactory.CreateHorizontalGroup(panel, "Toolbar", 14, TextAnchor.MiddleCenter);
-            toolbar.anchorMin = new Vector2(0.5f, 0f);
-            toolbar.anchorMax = new Vector2(0.5f, 0f);
-            toolbar.pivot = new Vector2(0.5f, 0f);
-            toolbar.anchoredPosition = new Vector2(0f, 24f);
-            toolbar.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, boardWidth);
-            UiFactory.CreateButton(toolbar, "HintButton", "提示", ShowHint, new Color(0.81f, 0.55f, 0.08f, 1f), 78, 180);
-            UiFactory.CreateButton(toolbar, "ShuffleButton", "洗牌", ShuffleBoard, new Color(0.12f, 0.34f, 0.55f, 1f), 78, 180);
-            UiFactory.CreateButton(toolbar, "BackButton", "返回前院", ShowHome, new Color(0.39f, 0.41f, 0.43f, 1f), 78, 180);
+            shell.ToolbarRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, boardWidth);
+            UiFactory.CreateButton(shell.ToolbarRoot, "HintButton", "提示", ShowHint, Theme.WarningButton, Mathf.RoundToInt(Theme.BottomToolbarHeight), 180);
+            UiFactory.CreateButton(shell.ToolbarRoot, "ShuffleButton", "洗牌", ShuffleBoard, Theme.InfoButton, Mathf.RoundToInt(Theme.BottomToolbarHeight), 180);
+            UiFactory.CreateButton(shell.ToolbarRoot, "BackButton", "返回前院", ShowHome, Theme.NeutralButton, Mathf.RoundToInt(Theme.BottomToolbarHeight), 180);
 
             RefreshBoardUi();
         }
@@ -330,10 +317,10 @@ namespace HappyFamily.Core
 
                 var colors = view.Button.colors;
                 colors.normalColor = tile.IsRemoved
-                    ? new Color(0.82f, 0.84f, 0.82f, 1f)
+                    ? Theme.TileRemovedBackground
                     : tile.IsSelected
-                        ? new Color(0.94f, 0.79f, 0.46f, 1f)
-                        : new Color(0.96f, 0.97f, 0.94f, 1f);
+                        ? Theme.TileSelectedBackground
+                        : Theme.TileBackground;
                 colors.highlightedColor = colors.normalColor;
                 colors.selectedColor = colors.normalColor;
                 colors.pressedColor = tile.IsSelected ? new Color(0.88f, 0.73f, 0.40f, 1f) : new Color(0.89f, 0.92f, 0.88f, 1f);
@@ -384,6 +371,137 @@ namespace HappyFamily.Core
             rectTransform.anchorMax = Vector2.one;
             rectTransform.offsetMin = new Vector2(left, bottom);
             rectTransform.offsetMax = new Vector2(-right, -top);
+        }
+
+        private HomeScreenShell BuildFallbackHomeShell()
+        {
+            var panel = UiFactory.CreatePanel(screenRoot, "HomePanel", Theme.HomeBackground);
+            var titleRoot = new GameObject("TitleRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
+            titleRoot.SetParent(panel, false);
+
+            var progressRoot = new GameObject("ProgressRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
+            progressRoot.SetParent(panel, false);
+
+            var actionRoot = new GameObject("ActionRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
+            actionRoot.SetParent(panel, false);
+
+            ConfigureColumn(titleRoot, 12);
+            ConfigureColumn(progressRoot, 20);
+            ConfigureColumn(actionRoot, 18);
+
+            var shell = panel.gameObject.AddComponent<HomeScreenShell>();
+            shell.Bind(panel, titleRoot, progressRoot, actionRoot);
+            return shell;
+        }
+
+        private HomeScreenShell BuildHomeShell(HomeScreenShell shellPrefab)
+        {
+            if (shellPrefab == null)
+            {
+                return BuildFallbackHomeShell();
+            }
+
+            var instance = Instantiate(shellPrefab, screenRoot, false);
+            if (instance == null || !instance.IsValid)
+            {
+                if (instance != null)
+                {
+                    Destroy(instance.gameObject);
+                }
+
+                return BuildFallbackHomeShell();
+            }
+
+            var rectTransform = instance.GetComponent<RectTransform>();
+            StretchRect(rectTransform, 0f, 0f, 0f, 0f);
+            return instance;
+        }
+
+        private LevelScreenShell BuildFallbackLevelShell()
+        {
+            var panel = UiFactory.CreateAbsolutePanel(screenRoot, "LevelPanel", Theme.LevelBackground);
+            StretchRect(panel, 0f, 0f, 0f, 0f);
+
+            var headerRoot = UiFactory.CreateAbsolutePanel(panel, "HeaderRoot", Theme.HeaderBackground);
+            SetTopRect(headerRoot, Theme.HorizontalPadding, Theme.HorizontalPadding, Theme.HorizontalPadding, Theme.HeaderHeight);
+            ConfigureAbsoluteColumn(headerRoot, new RectOffset(28, 28, 22, 18), 8);
+
+            var boardRoot = UiFactory.CreateAbsolutePanel(panel, "BoardRoot", Theme.BoardBackground);
+            StretchBetween(boardRoot, Theme.HorizontalPadding, Theme.BoardBottomInset, Theme.HorizontalPadding, Theme.BoardTopInset);
+
+            var toolbarRoot = new GameObject("ToolbarRoot", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
+            toolbarRoot.SetParent(panel, false);
+            toolbarRoot.anchorMin = new Vector2(0.5f, 0f);
+            toolbarRoot.anchorMax = new Vector2(0.5f, 0f);
+            toolbarRoot.pivot = new Vector2(0.5f, 0f);
+            toolbarRoot.anchoredPosition = new Vector2(0f, Theme.BottomToolbarInset);
+            var toolbarLayout = toolbarRoot.GetComponent<HorizontalLayoutGroup>();
+            toolbarLayout.spacing = 14;
+            toolbarLayout.padding = new RectOffset(0, 0, 12, 12);
+            toolbarLayout.childAlignment = TextAnchor.MiddleCenter;
+            toolbarLayout.childControlHeight = false;
+            toolbarLayout.childForceExpandHeight = false;
+            toolbarLayout.childControlWidth = false;
+            toolbarLayout.childForceExpandWidth = false;
+            var fitter = toolbarRoot.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var shell = panel.gameObject.AddComponent<LevelScreenShell>();
+            shell.Bind(panel, headerRoot, boardRoot, toolbarRoot);
+            return shell;
+        }
+
+        private LevelScreenShell BuildLevelShell(LevelScreenShell shellPrefab)
+        {
+            if (shellPrefab == null)
+            {
+                return BuildFallbackLevelShell();
+            }
+
+            var instance = Instantiate(shellPrefab, screenRoot, false);
+            if (instance == null || !instance.IsValid)
+            {
+                if (instance != null)
+                {
+                    Destroy(instance.gameObject);
+                }
+
+                return BuildFallbackLevelShell();
+            }
+
+            StretchRect(instance.Root, 0f, 0f, 0f, 0f);
+            return instance;
+        }
+
+        private static void ConfigureColumn(RectTransform rectTransform, int spacing)
+        {
+            var layout = rectTransform.GetComponent<VerticalLayoutGroup>();
+            layout.spacing = spacing;
+            layout.childControlHeight = false;
+            layout.childForceExpandHeight = false;
+            layout.childControlWidth = true;
+            layout.childForceExpandWidth = true;
+            layout.childAlignment = TextAnchor.UpperCenter;
+
+            var fitter = rectTransform.GetComponent<ContentSizeFitter>();
+            if (fitter != null)
+            {
+                fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            }
+        }
+
+        private static void ConfigureAbsoluteColumn(RectTransform rectTransform, RectOffset padding, int spacing)
+        {
+            var layout = rectTransform.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.padding = padding;
+            layout.spacing = spacing;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlHeight = false;
+            layout.childForceExpandHeight = false;
+            layout.childControlWidth = true;
+            layout.childForceExpandWidth = true;
         }
     }
 }

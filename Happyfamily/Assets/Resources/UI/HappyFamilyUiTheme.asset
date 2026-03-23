@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c05968528a3fe4b8a9afd26c255aff6f, type: 3}
+  m_Name: HappyFamilyUiTheme
+  m_EditorClassIdentifier: 
+  PrimaryFont: {fileID: 0}
+  ReferenceResolution: {x: 750, y: 1334}
+  ViewportMargin: 24
+  ScreenBackground: {r: 0.98, g: 0.97, b: 0.93, a: 1}
+  HomeBackground: {r: 0.95, g: 0.91, b: 0.82, a: 1}
+  LevelBackground: {r: 0.88, g: 0.93, b: 0.88, a: 1}
+  CardBackground: {r: 0.99, g: 0.98, b: 0.94, a: 1}
+  HeaderBackground: {r: 0.9, g: 0.94, b: 0.89, a: 1}
+  BoardBackground: {r: 0.95, g: 0.97, b: 0.92, a: 1}
+  TileBackground: {r: 0.96, g: 0.97, b: 0.94, a: 1}
+  TileSelectedBackground: {r: 0.94, g: 0.79, b: 0.46, a: 1}
+  TileRemovedBackground: {r: 0.82, g: 0.84, b: 0.82, a: 1}
+  PrimaryButton: {r: 0.73, g: 0.35, b: 0.18, a: 1}
+  SecondaryButton: {r: 0.42, g: 0.58, b: 0.32, a: 1}
+  WarningButton: {r: 0.81, g: 0.55, b: 0.08, a: 1}
+  InfoButton: {r: 0.12, g: 0.34, b: 0.55, a: 1}
+  NeutralButton: {r: 0.39, g: 0.41, b: 0.43, a: 1}
+  BodyText: {r: 0.33, g: 0.25, b: 0.18, a: 1}
+  HeadingText: {r: 0.24, g: 0.17, b: 0.12, a: 1}
+  LightText: {r: 1, g: 1, b: 1, a: 1}
+  HomeTitleSize: 58
+  HomeSubtitleSize: 28
+  HomeCardTitleSize: 42
+  HomeBodySize: 30
+  LevelTitleSize: 38
+  LevelBodySize: 22
+  ButtonTextSize: 30
+  HeaderHeight: 190
+  BottomToolbarInset: 24
+  BottomToolbarHeight: 78
+  HorizontalPadding: 24
+  BoardBottomInset: 120
+  BoardTopInset: 230
+  TileGap: 16
+  BoardPadding: 12

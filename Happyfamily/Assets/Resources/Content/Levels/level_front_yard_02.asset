@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85268e925314b4512ad07dc4bdae7a33, type: 3}
+  m_Name: level_front_yard_02
+  m_EditorClassIdentifier: 
+  LevelId: level_front_yard_02
+  DisplayName: "\u7B2C 2 \u5173\uFF1A\u7ED9\u82B1\u67B6\u817E\u51FA\u5730\u65B9"
+  Description: "\u7EE7\u7EED\u6574\u7406\u5E38\u7528\u7269\u4EF6\uFF0C\u4E3A\u524D\u9662\u6DFB\u4E00\u70B9\u751F\u6C14\u3002"
+  StepBudget: 9
+  StarReward: 1
+  PairLabels:
+  - "\u82B1\u76C6"
+  - "\u7AF9\u6905"
+  - "\u6708\u997C\u76D2"
+  - "\u7EBF\u56E2"
+  - "\u4FDD\u6E29\u58F6"
+  - "\u65E7\u76F8\u6846"

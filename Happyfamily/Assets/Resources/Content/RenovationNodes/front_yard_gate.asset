@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c840499ab9a2b40ae9f2eae8fddcaf36, type: 3}
+  m_Name: front_yard_gate
+  m_EditorClassIdentifier: 
+  NodeId: front_yard_gate
+  DisplayName: "\u7115\u65B0\u8282\u70B9\uFF1A\u4FEE\u9662\u95E8"
+  RequiredStars: 1
+  MemoryTitle: "\u9662\u95E8\u8FB9\u7684\u98CE"
+  MemoryText: "\u95E8\u53E3\u6536\u62FE\u5229\u843D\u4E86\uFF0C\u9662\u5B50\u91CC\u4E00\u4E0B\u5C31\u6709\u4E86\u4EBA\u6C14\u3002\u65E7\u6728\u95E8\u63A8\u5F00\u65F6\uFF0C\u50CF\u628A\u4ECE\u524D\u90A3\u4E9B\u5E73\u5E38\u65E5\u5B50\u4E5F\u4E00\u5E76\u63A8\u56DE\u6765\u4E86\u3002"
+  Options:
+  - OptionId: gate_warm_wood
+    DisplayName: "\u6696\u6728\u9662\u95E8"
+    Description: "\u66F4\u6734\u7D20\uFF0C\u50CF\u719F\u6089\u7684\u8001\u9662\u5B50\u3002"
+  - OptionId: gate_olive_green
+    DisplayName: "\u58A8\u7EFF\u9662\u95E8"
+    Description: "\u66F4\u6E05\u723D\uFF0C\u9662\u53E3\u663E\u5F97\u7CBE\u795E\u4E00\u4E9B\u3002"

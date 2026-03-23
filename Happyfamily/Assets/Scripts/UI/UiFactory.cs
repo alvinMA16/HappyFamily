@@ -1,8 +1,8 @@
 using System;
+using HappyFamily.UI.Components;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.TextCore.LowLevel;
 
 namespace HappyFamily.UI
 {
@@ -20,23 +20,9 @@ namespace HappyFamily.UI
 
     public static class UiFactory
     {
-        private static readonly Vector2 WeChatPortraitReference = new Vector2(750f, 1334f);
-        private static TMP_FontAsset cachedFontAsset;
-        private static readonly string[] ProjectFontResourcePaths =
-        {
-            "Fonts/NotoSansCJKsc-Regular SDF",
-            "Fonts/NotoSansSC-Regular SDF",
-            "Fonts/UI-Regular SDF"
-        };
-        private static readonly string[] ProjectRawFontResourcePaths =
-        {
-            "Fonts/NotoSansCJKsc-Regular",
-            "Fonts/NotoSansSC-Regular",
-            "Fonts/UI-Regular"
-        };
-
         public static Canvas CreateRootCanvas(string name, Transform parent)
         {
+            var theme = HappyFamilyUiThemeProvider.GetTheme();
             var canvasObject = new GameObject(name, typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasObject.transform.SetParent(parent, false);
 
@@ -46,7 +32,7 @@ namespace HappyFamily.UI
 
             var scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = WeChatPortraitReference;
+            scaler.referenceResolution = theme.ReferenceResolution;
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 1f;
 
@@ -55,6 +41,7 @@ namespace HappyFamily.UI
 
         public static RectTransform CreateScreenRoot(Transform parent, string name)
         {
+            var theme = HappyFamilyUiThemeProvider.GetTheme();
             var root = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(RectMask2D));
             root.transform.SetParent(parent, false);
 
@@ -64,9 +51,9 @@ namespace HappyFamily.UI
             rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
             var image = root.GetComponent<Image>();
-            image.color = new Color(0.98f, 0.97f, 0.93f, 1f);
+            image.color = theme.ScreenBackground;
 
-            FitRectToPortrait(rectTransform, parent as RectTransform, 24f);
+            FitRectToPortrait(rectTransform, parent as RectTransform, theme.ReferenceResolution, theme.ViewportMargin);
             return rectTransform;
         }
 
@@ -149,7 +136,7 @@ namespace HappyFamily.UI
             labelObject.transform.SetParent(parent, false);
 
             var label = labelObject.GetComponent<TextMeshProUGUI>();
-            label.font = GetFontAsset();
+            label.font = HappyFamilyUiThemeProvider.GetResolvedPrimaryFont();
             label.fontSize = fontSize;
             label.fontStyle = ToTmpFontStyle(fontStyle);
             label.alignment = ToTmpAlignment(alignment);
@@ -181,6 +168,7 @@ namespace HappyFamily.UI
             int height,
             int width = -1)
         {
+            var theme = HappyFamilyUiThemeProvider.GetTheme();
             var buttonObject = new GameObject(name, typeof(Image), typeof(Button), typeof(LayoutElement));
             buttonObject.transform.SetParent(parent, false);
 
@@ -204,10 +192,10 @@ namespace HappyFamily.UI
                 layoutElement.preferredWidth = width;
             }
 
-            var buttonText = CreateLabel(buttonObject.transform, "Label", label, 30, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white, height - 20);
+            var buttonText = CreateLabel(buttonObject.transform, "Label", label, theme.ButtonTextSize, FontStyle.Bold, TextAnchor.MiddleCenter, theme.LightText, height - 20);
             buttonText.enableAutoSizing = true;
             buttonText.fontSizeMin = 20;
-            buttonText.fontSizeMax = 30;
+            buttonText.fontSizeMax = theme.ButtonTextSize;
             var buttonTextFitter = buttonText.GetComponent<ContentSizeFitter>();
             buttonTextFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             buttonTextFitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
@@ -268,10 +256,61 @@ namespace HappyFamily.UI
 
         public static TileButtonView CreateTileButton(Transform parent, string name, string label, Action onClick)
         {
-            var button = CreateButton(parent, name, label, onClick, new Color(0.96f, 0.97f, 0.94f, 1f), 132);
+            var theme = HappyFamilyUiThemeProvider.GetTheme();
+            var button = CreateButton(parent, name, label, onClick, theme.TileBackground, 132);
             var text = button.GetComponentInChildren<TextMeshProUGUI>();
-            text.color = new Color(0.22f, 0.24f, 0.20f, 1f);
+            text.color = theme.HeadingText;
             return new TileButtonView(button, text);
+        }
+
+        public static RectTransform CreateCardWithPrefab(Transform parent, string name, Color backgroundColor)
+        {
+            var prefab = UiComponentPrefabProvider.LoadCardPrefab();
+            if (prefab == null || !prefab.IsValid)
+            {
+                return CreateCard(parent, name, backgroundColor);
+            }
+
+            var instance = UnityEngine.Object.Instantiate(prefab, parent, false);
+            instance.name = name;
+            instance.SetBackgroundColor(backgroundColor);
+            return instance.ContentRoot;
+        }
+
+        public static Button CreateButtonWithPrefab(
+            Transform parent,
+            string name,
+            string label,
+            Action onClick,
+            Color backgroundColor,
+            int height,
+            int width = -1)
+        {
+            var prefab = UiComponentPrefabProvider.LoadButtonPrefab();
+            if (prefab == null || !prefab.IsValid)
+            {
+                return CreateButton(parent, name, label, onClick, backgroundColor, height, width);
+            }
+
+            var instance = UnityEngine.Object.Instantiate(prefab, parent, false);
+            instance.name = name;
+            instance.Configure(label, onClick, backgroundColor, height, width);
+            return instance.Button;
+        }
+
+        public static TileButtonView CreateTileButtonWithPrefab(Transform parent, string name, string label, Action onClick)
+        {
+            var theme = HappyFamilyUiThemeProvider.GetTheme();
+            var prefab = UiComponentPrefabProvider.LoadTileButtonPrefab();
+            if (prefab == null || !prefab.IsValid)
+            {
+                return CreateTileButton(parent, name, label, onClick);
+            }
+
+            var instance = UnityEngine.Object.Instantiate(prefab, parent, false);
+            instance.name = name;
+            instance.Configure(label, onClick, theme.TileBackground, theme.HeadingText);
+            return new TileButtonView(instance.Button, instance.Label);
         }
 
         public static void ClearChildren(Transform parent)
@@ -279,85 +318,6 @@ namespace HappyFamily.UI
             for (var index = parent.childCount - 1; index >= 0; index--)
             {
                 UnityEngine.Object.Destroy(parent.GetChild(index).gameObject);
-            }
-        }
-
-        private static TMP_FontAsset GetFontAsset()
-        {
-            if (cachedFontAsset == null)
-            {
-                foreach (var resourcePath in ProjectFontResourcePaths)
-                {
-                    cachedFontAsset = Resources.Load<TMP_FontAsset>(resourcePath);
-                    if (cachedFontAsset != null)
-                    {
-                        return cachedFontAsset;
-                    }
-                }
-
-                foreach (var resourcePath in ProjectRawFontResourcePaths)
-                {
-                    var projectFont = Resources.Load<Font>(resourcePath);
-                    if (projectFont == null)
-                    {
-                        continue;
-                    }
-
-                    cachedFontAsset = TMP_FontAsset.CreateFontAsset(
-                        projectFont,
-                        128,
-                        8,
-                        GlyphRenderMode.SDFAA_HINTED,
-                        2048,
-                        2048,
-                        AtlasPopulationMode.Dynamic,
-                        true);
-                    if (cachedFontAsset != null)
-                    {
-                        return cachedFontAsset;
-                    }
-                }
-
-                var systemFont = TryCreateSystemFont();
-                if (systemFont != null)
-                {
-                    cachedFontAsset = TMP_FontAsset.CreateFontAsset(
-                        systemFont,
-                        128,
-                        8,
-                        GlyphRenderMode.SDFAA_HINTED,
-                        2048,
-                        2048,
-                        AtlasPopulationMode.Dynamic,
-                        true);
-                }
-
-                cachedFontAsset ??= TMP_Settings.defaultFontAsset;
-                cachedFontAsset ??= Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
-            }
-
-            return cachedFontAsset;
-        }
-
-        private static Font TryCreateSystemFont()
-        {
-            try
-            {
-                return Font.CreateDynamicFontFromOSFont(
-                    new[]
-                    {
-                        "PingFang SC",
-                        "Hiragino Sans GB",
-                        "Heiti SC",
-                        "Microsoft YaHei",
-                        "SimHei",
-                        "Arial Unicode MS"
-                    },
-                    32);
-            }
-            catch
-            {
-                return null;
             }
         }
 
@@ -389,7 +349,7 @@ namespace HappyFamily.UI
             };
         }
 
-        private static void FitRectToPortrait(RectTransform target, RectTransform parent, float margin)
+        private static void FitRectToPortrait(RectTransform target, RectTransform parent, Vector2 referenceSize, float margin)
         {
             if (target == null || parent == null)
             {
@@ -399,7 +359,7 @@ namespace HappyFamily.UI
             var parentSize = parent.rect.size;
             var availableWidth = Mathf.Max(0f, parentSize.x - margin * 2f);
             var availableHeight = Mathf.Max(0f, parentSize.y - margin * 2f);
-            var targetAspect = WeChatPortraitReference.x / WeChatPortraitReference.y;
+            var targetAspect = referenceSize.x / referenceSize.y;
             var availableAspect = availableHeight <= 0f ? targetAspect : availableWidth / availableHeight;
 
             float width;
