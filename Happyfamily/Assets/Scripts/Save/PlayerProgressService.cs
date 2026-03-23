@@ -1,5 +1,5 @@
 using System;
-using Unity.UOS.Encrypt;
+using System.Text;
 using UnityEngine;
 
 namespace HappyFamily.Save
@@ -15,18 +15,18 @@ namespace HappyFamily.Save
                 return HappyFamilySaveData.CreateDefault();
             }
 
-            var encryptedPayload = PlayerPrefs.GetString(SaveKey, string.Empty);
-            if (string.IsNullOrWhiteSpace(encryptedPayload))
+            var encodedPayload = PlayerPrefs.GetString(SaveKey, string.Empty);
+            if (string.IsNullOrWhiteSpace(encodedPayload))
             {
                 return HappyFamilySaveData.CreateDefault();
             }
 
             try
             {
-                var json = EncryptManager.Decrypt(encryptedPayload);
+                var json = Decode(encodedPayload);
                 if (string.IsNullOrWhiteSpace(json))
                 {
-                    json = encryptedPayload;
+                    json = encodedPayload;
                 }
 
                 var data = JsonUtility.FromJson<HappyFamilySaveData>(json) ?? HappyFamilySaveData.CreateDefault();
@@ -44,9 +44,39 @@ namespace HappyFamily.Save
         {
             data.Normalize();
             var json = JsonUtility.ToJson(data);
-            var encryptedPayload = EncryptManager.Encrypt(json);
-            PlayerPrefs.SetString(SaveKey, encryptedPayload);
+            var encodedPayload = Encode(json);
+            PlayerPrefs.SetString(SaveKey, encodedPayload);
             PlayerPrefs.Save();
+        }
+
+        private static string Encode(string plainText)
+        {
+            if (string.IsNullOrEmpty(plainText))
+            {
+                return string.Empty;
+            }
+
+            var bytes = Encoding.UTF8.GetBytes(plainText);
+            return Convert.ToBase64String(bytes);
+        }
+
+        private static string Decode(string encodedText)
+        {
+            if (string.IsNullOrEmpty(encodedText))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var bytes = Convert.FromBase64String(encodedText);
+                return Encoding.UTF8.GetString(bytes);
+            }
+            catch
+            {
+                // Fallback: assume it's plain JSON (for backward compatibility)
+                return encodedText;
+            }
         }
     }
 }

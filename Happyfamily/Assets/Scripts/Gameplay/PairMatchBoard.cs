@@ -208,20 +208,18 @@ namespace HappyFamily.Gameplay
 
         private static void Shuffle(List<PairMatchTileState> tiles)
         {
-            var random = new System.Random();
             for (var index = tiles.Count - 1; index > 0; index--)
             {
-                var swapIndex = random.Next(index + 1);
+                var swapIndex = UnityEngine.Random.Range(0, index + 1);
                 (tiles[index], tiles[swapIndex]) = (tiles[swapIndex], tiles[index]);
             }
         }
 
         private static void Shuffle(List<(string PairId, string DisplayLabel)> tiles)
         {
-            var random = new System.Random();
             for (var index = tiles.Count - 1; index > 0; index--)
             {
-                var swapIndex = random.Next(index + 1);
+                var swapIndex = UnityEngine.Random.Range(0, index + 1);
                 (tiles[index], tiles[swapIndex]) = (tiles[swapIndex], tiles[index]);
             }
         }

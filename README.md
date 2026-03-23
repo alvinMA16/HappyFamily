@@ -45,3 +45,24 @@ UI 字体现已切到 TextMeshPro，后续正式字体优先从 `Assets/Resource
 - `Assets/Resources/Fonts/UI-Regular SDF.asset`
 
 建议在 Unity 中导入 OTF/TTF 后生成对应的 `TMP Font Asset`，放进上述路径之一。
+
+现在项目内已提供一键生成入口：
+
+1. 打开 Unity 工程。
+2. 菜单栏执行 `HappyFamily/UI/Build Theme Assets`。
+3. 这会自动生成：
+   - `Assets/Resources/Fonts/NotoSansCJKsc-Regular SDF.asset`
+   - `Assets/Resources/UI/HappyFamilyUiTheme.asset`
+
+运行时会优先读取这个正式 `UI Theme` 资产。
+
+## Screen Shell Prefab
+
+现在还提供第二个菜单：
+
+1. 菜单栏执行 `HappyFamily/UI/Build Screen Prefabs`
+2. 会生成：
+   - `Assets/Resources/UI/Prefabs/HomeScreenShell.prefab`
+   - `Assets/Resources/UI/Prefabs/LevelScreenShell.prefab`
+
+运行时会优先实例化这些 screen shell prefab；如果 prefab 不存在，则回退到代码生成的布局。
