@@ -7,6 +7,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using System;
 
 namespace HappyFamily.Core
 {
@@ -19,6 +20,7 @@ namespace HappyFamily.Core
         private PlayerProgressService progressService;
         private HappyFamilySaveData saveData;
         private MvpChapterDefinition chapterDefinition;
+        private TidyUpChapterDefinition tidyUpChapter;
         private PairMatchBoard activeBoard;
         private MvpLevelDefinition activeLevel;
         private string currentLevelMessage = string.Empty;
@@ -35,6 +37,7 @@ namespace HappyFamily.Core
             progressService = new PlayerProgressService();
             saveData = progressService.Load();
             chapterDefinition = MvpContentProvider.GetFrontYardChapter();
+            tidyUpChapter = TidyUpContentFactory.CreateTidyUpChapter();
         }
 
         private void Start()
@@ -92,6 +95,12 @@ namespace HappyFamily.Core
             }
 
             UiFactory.CreateButton(shell.ActionRoot, "ResetButton", ResetButtonText, ResetProgress, Theme.NeutralButton, 92);
+
+            // TidyUp mode button
+            if (tidyUpChapter != null && tidyUpChapter.Levels.Count > 0)
+            {
+                UiFactory.CreateButton(shell.ActionRoot, "TidyUpButton", "整理收纳模式", ShowTidyUpLevelSelect, Theme.InfoButton, 92);
+            }
         }
 
         private void RenderRenovationNode(RectTransform parent, MvpRenovationNodeDefinition nodeDefinition)
@@ -299,6 +308,121 @@ namespace HappyFamily.Core
 
             return null;
         }
+
+        #region TidyUp Mode
+
+        private void ShowTidyUpLevelSelect()
+        {
+            UiFactory.ClearChildren(screenRoot);
+
+            var panel = UiFactory.CreatePanel(screenRoot, "TidyUpSelectPanel", Theme.HomeBackground);
+
+            // Adjust the existing layout group settings
+            var panelLayout = panel.GetComponent<VerticalLayoutGroup>();
+            if (panelLayout != null)
+            {
+                panelLayout.padding = new RectOffset(24, 24, 40, 40);
+                panelLayout.spacing = 20;
+            }
+
+            var titleRoot = new GameObject("TitleRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
+            titleRoot.SetParent(panel, false);
+            ConfigureColumn(titleRoot, 12);
+
+            var levelsRoot = new GameObject("LevelsRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
+            levelsRoot.SetParent(panel, false);
+            ConfigureColumn(levelsRoot, 16);
+
+            var actionRoot = new GameObject("ActionRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
+            actionRoot.SetParent(panel, false);
+            ConfigureColumn(actionRoot, 12);
+
+            UiFactory.CreateLabel(titleRoot, "Title", tidyUpChapter.DisplayName, Theme.HomeTitleSize, FontStyle.Bold, TextAnchor.MiddleCenter, Theme.HeadingText);
+            UiFactory.CreateLabel(titleRoot, "Subtitle", "选择关卡开始整理收纳", Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
+
+            foreach (var level in tidyUpChapter.Levels)
+            {
+                var capturedLevel = level;
+                var levelCard = UiFactory.CreateCard(levelsRoot, $"Level_{level.Id}", Theme.CardBackground);
+                UiFactory.CreateLabel(levelCard, "LevelName", level.DisplayName, Theme.HomeCardTitleSize, FontStyle.Bold, TextAnchor.MiddleLeft, Theme.HeadingText);
+                UiFactory.CreateLabel(levelCard, "LevelDesc", level.Description, Theme.HomeBodySize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
+                UiFactory.CreateLabel(levelCard, "LevelInfo", $"物品种类: {level.Items.Count}  网格: {level.GridWidth}x{level.GridHeight}  层数: {level.MaxLayers}", Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
+                UiFactory.CreateButton(levelCard, "PlayButton", "开始整理", () => ShowTidyUpLevel(capturedLevel), Theme.PrimaryButton, 80);
+            }
+
+            UiFactory.CreateButton(actionRoot, "BackButton", "返回首页", ShowHome, Theme.NeutralButton, 92);
+        }
+
+        private void ShowTidyUpLevel(TidyUpLevelDefinition levelDefinition)
+        {
+            UiFactory.ClearChildren(screenRoot);
+
+            // Create main panel
+            var panel = UiFactory.CreateAbsolutePanel(screenRoot, "TidyUpPanel", Theme.LevelBackground);
+            StretchRect(panel, 0f, 0f, 0f, 0f);
+
+            // Header
+            var headerRoot = UiFactory.CreateAbsolutePanel(panel, "HeaderRoot", Theme.HeaderBackground);
+            SetTopRect(headerRoot, Theme.HorizontalPadding, Theme.HorizontalPadding, Theme.HorizontalPadding, 120f);
+            ConfigureAbsoluteColumn(headerRoot, new RectOffset(28, 28, 18, 14), 6);
+
+            UiFactory.CreateLabel(headerRoot, "Title", levelDefinition.DisplayName, Theme.LevelTitleSize, FontStyle.Bold, TextAnchor.MiddleCenter, Theme.HeadingText);
+            UiFactory.CreateLabel(headerRoot, "Description", levelDefinition.Description, Theme.LevelBodySize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
+
+            // Tiles container (center area)
+            var tilesContainer = UiFactory.CreateAbsolutePanel(panel, "TilesContainer", new Color(0.95f, 0.93f, 0.9f));
+            StretchBetween(tilesContainer, Theme.HorizontalPadding, 200f, Theme.HorizontalPadding, 150f);
+
+            // Slots container (bottom shelf) - height for 3:4 ratio slots
+            var slotsContainer = new GameObject("SlotsContainer", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+            slotsContainer.SetParent(panel, false);
+            slotsContainer.anchorMin = new Vector2(0f, 0f);
+            slotsContainer.anchorMax = new Vector2(1f, 0f);
+            slotsContainer.pivot = new Vector2(0.5f, 0f);
+            slotsContainer.anchoredPosition = new Vector2(0f, 90f);
+            slotsContainer.sizeDelta = new Vector2(-Theme.HorizontalPadding * 2f, 86f);
+            var slotsImage = slotsContainer.GetComponent<Image>();
+            slotsImage.color = new Color(0.8f, 0.75f, 0.7f);
+
+            // Status label
+            var statusLabel = UiFactory.CreateLabel(panel, "StatusLabel", "", Theme.LevelBodySize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
+            var statusRect = statusLabel.GetComponent<RectTransform>();
+            statusRect.anchorMin = new Vector2(0f, 0f);
+            statusRect.anchorMax = new Vector2(1f, 0f);
+            statusRect.pivot = new Vector2(0.5f, 0f);
+            statusRect.anchoredPosition = new Vector2(0f, 60f);
+            statusRect.sizeDelta = new Vector2(0f, 30f);
+
+            // Back button
+            var backButton = UiFactory.CreateButton(panel, "BackButton", "返回", () => { }, Theme.NeutralButton, 60, 120);
+            var backRect = backButton.GetComponent<RectTransform>();
+            backRect.anchorMin = new Vector2(0f, 0f);
+            backRect.anchorMax = new Vector2(0f, 0f);
+            backRect.pivot = new Vector2(0f, 0f);
+            backRect.anchoredPosition = new Vector2(Theme.HorizontalPadding, 20f);
+
+            // Initialize the TidyUp screen with runtime initializer
+            var runtimeInit = panel.gameObject.AddComponent<TidyUpScreenRuntimeInitializer>();
+            runtimeInit.Initialize(levelDefinition, tilesContainer, slotsContainer, backButton, statusLabel,
+                ShowTidyUpLevelSelect, OnTidyUpLevelComplete);
+        }
+
+        private void OnTidyUpLevelComplete(bool success)
+        {
+            if (success)
+            {
+                Debug.Log("TidyUp level completed successfully!");
+            }
+            else
+            {
+                Debug.Log("TidyUp level failed.");
+            }
+
+            // Return to level select after a delay
+            Invoke(nameof(ShowTidyUpLevelSelect), 1.5f);
+        }
+
+        #endregion
 
         private void RefreshBoardUi()
         {
