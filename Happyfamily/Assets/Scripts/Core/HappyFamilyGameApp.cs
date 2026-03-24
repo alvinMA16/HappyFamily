@@ -315,95 +315,189 @@ namespace HappyFamily.Core
         {
             UiFactory.ClearChildren(screenRoot);
 
-            var panel = UiFactory.CreatePanel(screenRoot, "TidyUpSelectPanel", Theme.HomeBackground);
+            // 主面板
+            var panel = UiFactory.CreateAbsolutePanel(screenRoot, "TidyUpSelectPanel", Theme.HomeBackground);
+            StretchRect(panel, 0f, 0f, 0f, 0f);
 
-            // Adjust the existing layout group settings
-            var panelLayout = panel.GetComponent<VerticalLayoutGroup>();
-            if (panelLayout != null)
-            {
-                panelLayout.padding = new RectOffset(24, 24, 40, 40);
-                panelLayout.spacing = 20;
-            }
+            // 顶部标题区域 (固定高度)
+            var headerRoot = new GameObject("HeaderRoot", typeof(RectTransform), typeof(VerticalLayoutGroup)).GetComponent<RectTransform>();
+            headerRoot.SetParent(panel, false);
+            headerRoot.anchorMin = new Vector2(0f, 1f);
+            headerRoot.anchorMax = new Vector2(1f, 1f);
+            headerRoot.pivot = new Vector2(0.5f, 1f);
+            headerRoot.anchoredPosition = Vector2.zero;
+            headerRoot.sizeDelta = new Vector2(0f, 120f);
+            var headerLayout = headerRoot.GetComponent<VerticalLayoutGroup>();
+            headerLayout.padding = new RectOffset(24, 24, 24, 12);
+            headerLayout.spacing = 8;
+            headerLayout.childAlignment = TextAnchor.MiddleCenter;
+            headerLayout.childControlHeight = false;
+            headerLayout.childForceExpandHeight = false;
 
-            var titleRoot = new GameObject("TitleRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
-            titleRoot.SetParent(panel, false);
-            ConfigureColumn(titleRoot, 12);
+            UiFactory.CreateLabel(headerRoot, "Title", tidyUpChapter.DisplayName, Theme.HomeTitleSize, FontStyle.Bold, TextAnchor.MiddleCenter, Theme.HeadingText);
+            UiFactory.CreateLabel(headerRoot, "Subtitle", "选择关卡开始整理收纳", Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
 
-            var levelsRoot = new GameObject("LevelsRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
-            levelsRoot.SetParent(panel, false);
-            ConfigureColumn(levelsRoot, 16);
+            // 底部按钮区域 (固定高度)
+            var footerRoot = new GameObject("FooterRoot", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+            footerRoot.SetParent(panel, false);
+            footerRoot.anchorMin = new Vector2(0f, 0f);
+            footerRoot.anchorMax = new Vector2(1f, 0f);
+            footerRoot.pivot = new Vector2(0.5f, 0f);
+            footerRoot.anchoredPosition = Vector2.zero;
+            footerRoot.sizeDelta = new Vector2(0f, 100f);
+            footerRoot.GetComponent<Image>().color = Theme.HomeBackground;
 
-            var actionRoot = new GameObject("ActionRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter)).GetComponent<RectTransform>();
-            actionRoot.SetParent(panel, false);
-            ConfigureColumn(actionRoot, 12);
+            var backButton = UiFactory.CreateButton(footerRoot, "BackButton", "返回首页", ShowHome, Theme.NeutralButton, 56, 200);
+            var backRect = backButton.GetComponent<RectTransform>();
+            backRect.anchorMin = new Vector2(0.5f, 0.5f);
+            backRect.anchorMax = new Vector2(0.5f, 0.5f);
+            backRect.anchoredPosition = Vector2.zero;
 
-            UiFactory.CreateLabel(titleRoot, "Title", tidyUpChapter.DisplayName, Theme.HomeTitleSize, FontStyle.Bold, TextAnchor.MiddleCenter, Theme.HeadingText);
-            UiFactory.CreateLabel(titleRoot, "Subtitle", "选择关卡开始整理收纳", Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
+            // 中间滚动区域 (关卡列表)
+            var scrollViewObj = new GameObject("ScrollView", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
+            var scrollRect = scrollViewObj.GetComponent<RectTransform>();
+            scrollRect.SetParent(panel, false);
+            scrollRect.anchorMin = Vector2.zero;
+            scrollRect.anchorMax = Vector2.one;
+            scrollRect.offsetMin = new Vector2(0f, 100f); // 底部留出按钮空间
+            scrollRect.offsetMax = new Vector2(0f, -120f); // 顶部留出标题空间
+            scrollViewObj.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f); // 透明背景
 
+            // 内容容器
+            var contentObj = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            var contentRect = contentObj.GetComponent<RectTransform>();
+            contentRect.SetParent(scrollRect, false);
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.anchoredPosition = Vector2.zero;
+            contentRect.sizeDelta = new Vector2(0f, 0f);
+
+            var contentLayout = contentObj.GetComponent<VerticalLayoutGroup>();
+            contentLayout.padding = new RectOffset(24, 24, 16, 24);
+            contentLayout.spacing = 16;
+            contentLayout.childAlignment = TextAnchor.UpperCenter;
+            contentLayout.childControlHeight = false;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandWidth = true;
+
+            var contentFitter = contentObj.GetComponent<ContentSizeFitter>();
+            contentFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            // 设置ScrollRect
+            var scrollComponent = scrollViewObj.GetComponent<ScrollRect>();
+            scrollComponent.content = contentRect;
+            scrollComponent.horizontal = false;
+            scrollComponent.vertical = true;
+            scrollComponent.movementType = ScrollRect.MovementType.Elastic;
+            scrollComponent.elasticity = 0.1f;
+
+            // Viewport (裁剪区域)
+            var viewportObj = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            var viewportRect = viewportObj.GetComponent<RectTransform>();
+            viewportRect.SetParent(scrollRect, false);
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = Vector2.zero;
+            viewportRect.offsetMax = Vector2.zero;
+            viewportObj.GetComponent<Image>().color = Color.white;
+            viewportObj.GetComponent<Mask>().showMaskGraphic = false;
+            scrollComponent.viewport = viewportRect;
+
+            // 重新设置content的父级为viewport
+            contentRect.SetParent(viewportRect, false);
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.anchoredPosition = Vector2.zero;
+
+            // 添加关卡卡片
             foreach (var level in tidyUpChapter.Levels)
             {
                 var capturedLevel = level;
-                var levelCard = UiFactory.CreateCard(levelsRoot, $"Level_{level.Id}", Theme.CardBackground);
+                var levelCard = UiFactory.CreateCard(contentRect, $"Level_{level.Id}", Theme.CardBackground);
                 UiFactory.CreateLabel(levelCard, "LevelName", level.DisplayName, Theme.HomeCardTitleSize, FontStyle.Bold, TextAnchor.MiddleLeft, Theme.HeadingText);
                 UiFactory.CreateLabel(levelCard, "LevelDesc", level.Description, Theme.HomeBodySize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
-                UiFactory.CreateLabel(levelCard, "LevelInfo", $"物品种类: {level.Items.Count}  网格: {level.GridWidth}x{level.GridHeight}  层数: {level.MaxLayers}", Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
-                UiFactory.CreateButton(levelCard, "PlayButton", "开始整理", () => ShowTidyUpLevel(capturedLevel), Theme.PrimaryButton, 80);
+                UiFactory.CreateLabel(levelCard, "LevelInfo", $"物品: {level.Items.Count}种  网格: {level.GridWidth}x{level.GridHeight}  层数: {level.MaxLayers}", Theme.HomeSubtitleSize, FontStyle.Normal, TextAnchor.MiddleLeft, Theme.BodyText);
+                UiFactory.CreateButton(levelCard, "PlayButton", "开始整理", () => ShowTidyUpLevel(capturedLevel), Theme.PrimaryButton, 60);
             }
-
-            UiFactory.CreateButton(actionRoot, "BackButton", "返回首页", ShowHome, Theme.NeutralButton, 92);
         }
 
         private void ShowTidyUpLevel(TidyUpLevelDefinition levelDefinition)
         {
             UiFactory.ClearChildren(screenRoot);
 
-            // Create main panel
-            var panel = UiFactory.CreateAbsolutePanel(screenRoot, "TidyUpPanel", Theme.LevelBackground);
+            // Create main panel with warm background
+            var panel = UiFactory.CreateAbsolutePanel(screenRoot, "TidyUpPanel", new Color(0.96f, 0.94f, 0.90f));
             StretchRect(panel, 0f, 0f, 0f, 0f);
 
-            // Header
-            var headerRoot = UiFactory.CreateAbsolutePanel(panel, "HeaderRoot", Theme.HeaderBackground);
-            SetTopRect(headerRoot, Theme.HorizontalPadding, Theme.HorizontalPadding, Theme.HorizontalPadding, 120f);
-            ConfigureAbsoluteColumn(headerRoot, new RectOffset(28, 28, 18, 14), 6);
+            // Top bar with back button and title
+            var topBar = new GameObject("TopBar", typeof(RectTransform)).GetComponent<RectTransform>();
+            topBar.SetParent(panel, false);
+            topBar.anchorMin = new Vector2(0f, 1f);
+            topBar.anchorMax = new Vector2(1f, 1f);
+            topBar.pivot = new Vector2(0.5f, 1f);
+            topBar.anchoredPosition = Vector2.zero;
+            topBar.sizeDelta = new Vector2(0f, 80f);
 
-            UiFactory.CreateLabel(headerRoot, "Title", levelDefinition.DisplayName, Theme.LevelTitleSize, FontStyle.Bold, TextAnchor.MiddleCenter, Theme.HeadingText);
-            UiFactory.CreateLabel(headerRoot, "Description", levelDefinition.Description, Theme.LevelBodySize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
+            // Back button (top left, text only style)
+            var backButton = UiFactory.CreateButton(topBar.transform, "BackButton", "返回", () => { }, Theme.NeutralButton, 44, 80);
+            var backRect = backButton.GetComponent<RectTransform>();
+            backRect.anchorMin = new Vector2(0f, 0.5f);
+            backRect.anchorMax = new Vector2(0f, 0.5f);
+            backRect.pivot = new Vector2(0f, 0.5f);
+            backRect.anchoredPosition = new Vector2(12f, 0f);
+            // Make button background transparent
+            var backImage = backButton.GetComponent<Image>();
+            if (backImage != null) backImage.color = new Color(1f, 1f, 1f, 0f);
+            var backText = backButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (backText != null)
+            {
+                backText.color = new Color(0.45f, 0.42f, 0.38f);
+                backText.fontSize = 20;
+            }
 
-            // Tiles container (center area)
-            var tilesContainer = UiFactory.CreateAbsolutePanel(panel, "TilesContainer", new Color(0.95f, 0.93f, 0.9f));
-            StretchBetween(tilesContainer, Theme.HorizontalPadding, 200f, Theme.HorizontalPadding, 150f);
+            // Title (centered)
+            var titleLabel = UiFactory.CreateLabel(topBar.transform, "Title", levelDefinition.DisplayName, 32, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(0.3f, 0.28f, 0.25f));
+            var titleRect = titleLabel.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.2f, 0f);
+            titleRect.anchorMax = new Vector2(0.8f, 1f);
+            titleRect.offsetMin = Vector2.zero;
+            titleRect.offsetMax = Vector2.zero;
 
-            // Slots container (bottom shelf) - height for 3:4 ratio slots
+            // Status label (top right)
+            var statusLabel = UiFactory.CreateLabel(topBar.transform, "StatusLabel", "", 20, FontStyle.Normal, TextAnchor.MiddleRight, new Color(0.5f, 0.48f, 0.45f));
+            var statusRect = statusLabel.GetComponent<RectTransform>();
+            statusRect.anchorMin = new Vector2(1f, 0.5f);
+            statusRect.anchorMax = new Vector2(1f, 0.5f);
+            statusRect.pivot = new Vector2(1f, 0.5f);
+            statusRect.anchoredPosition = new Vector2(-20f, 0f);
+            statusRect.sizeDelta = new Vector2(120f, 40f);
+
+            // Tiles container (main game area)
+            var tilesContainer = new GameObject("TilesContainer", typeof(RectTransform)).GetComponent<RectTransform>();
+            tilesContainer.SetParent(panel, false);
+            tilesContainer.anchorMin = Vector2.zero;
+            tilesContainer.anchorMax = Vector2.one;
+            tilesContainer.offsetMin = new Vector2(12f, 120f);
+            tilesContainer.offsetMax = new Vector2(-12f, -90f);
+
+            // Slots container (bottom bar)
             var slotsContainer = new GameObject("SlotsContainer", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
             slotsContainer.SetParent(panel, false);
             slotsContainer.anchorMin = new Vector2(0f, 0f);
             slotsContainer.anchorMax = new Vector2(1f, 0f);
             slotsContainer.pivot = new Vector2(0.5f, 0f);
-            slotsContainer.anchoredPosition = new Vector2(0f, 90f);
-            slotsContainer.sizeDelta = new Vector2(-Theme.HorizontalPadding * 2f, 86f);
+            slotsContainer.anchoredPosition = new Vector2(0f, 24f);
+            slotsContainer.sizeDelta = new Vector2(-32f, 72f);
             var slotsImage = slotsContainer.GetComponent<Image>();
-            slotsImage.color = new Color(0.8f, 0.75f, 0.7f);
-
-            // Status label
-            var statusLabel = UiFactory.CreateLabel(panel, "StatusLabel", "", Theme.LevelBodySize, FontStyle.Normal, TextAnchor.MiddleCenter, Theme.BodyText);
-            var statusRect = statusLabel.GetComponent<RectTransform>();
-            statusRect.anchorMin = new Vector2(0f, 0f);
-            statusRect.anchorMax = new Vector2(1f, 0f);
-            statusRect.pivot = new Vector2(0.5f, 0f);
-            statusRect.anchoredPosition = new Vector2(0f, 60f);
-            statusRect.sizeDelta = new Vector2(0f, 30f);
-
-            // Back button
-            var backButton = UiFactory.CreateButton(panel, "BackButton", "返回", () => { }, Theme.NeutralButton, 60, 120);
-            var backRect = backButton.GetComponent<RectTransform>();
-            backRect.anchorMin = new Vector2(0f, 0f);
-            backRect.anchorMax = new Vector2(0f, 0f);
-            backRect.pivot = new Vector2(0f, 0f);
-            backRect.anchoredPosition = new Vector2(Theme.HorizontalPadding, 20f);
+            slotsImage.color = new Color(0.88f, 0.85f, 0.80f);
 
             // Initialize the TidyUp screen with runtime initializer
             var runtimeInit = panel.gameObject.AddComponent<TidyUpScreenRuntimeInitializer>();
-            runtimeInit.Initialize(levelDefinition, tilesContainer, slotsContainer, backButton, statusLabel,
+            runtimeInit.Initialize(levelDefinition, tilesContainer, slotsContainer, backButton, titleLabel, statusLabel,
                 ShowTidyUpLevelSelect, OnTidyUpLevelComplete);
         }
 

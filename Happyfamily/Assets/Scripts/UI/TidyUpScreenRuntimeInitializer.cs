@@ -8,37 +8,68 @@ using UnityEngine.UI;
 
 namespace HappyFamily.UI
 {
-    /// <summary>
-    /// Runtime initializer for TidyUpScreenShell when creating UI dynamically.
-    /// </summary>
     public class TidyUpScreenRuntimeInitializer : MonoBehaviour
     {
+        // 卡片宽高比 (宽:高) 约 256:341 ≈ 0.75
+        private const float TileAspectRatio = 0.75f;
+        // 横排固定7个（和收纳栏槽位数一致）
+        private const int TilesPerRow = 7;
+
         private TidyUpBoard _board;
         private TidyUpLevelDefinition _levelDefinition;
         private RectTransform _tilesContainer;
         private RectTransform _slotsContainer;
         private Button _backButton;
+        private TextMeshProUGUI _titleLabel;
         private TextMeshProUGUI _statusLabel;
         private Action _onBack;
         private Action<bool> _onLevelComplete;
 
-        private List<GameObject> _tileObjects = new List<GameObject>();
-        private List<Image> _slotImages = new List<Image>();
+        private List<TileView> _tileViews = new List<TileView>();
+        private List<SlotView> _slotViews = new List<SlotView>();
         private Dictionary<string, Sprite> _spriteCache = new Dictionary<string, Sprite>();
 
-        public void Initialize(TidyUpLevelDefinition levelDefinition,
-            RectTransform tilesContainer, RectTransform slotsContainer, Button backButton, TextMeshProUGUI statusLabel,
-            Action onBack, Action<bool> onLevelComplete)
+        // 统一的卡片尺寸（游戏区和收纳栏共用）
+        private float _tileWidth;
+        private float _tileHeight;
+
+        private class TileView
+        {
+            public GameObject Root;
+            public int TileIndex;
+            public Image SpriteImage;
+            public Button Button;
+        }
+
+        private class SlotView
+        {
+            public GameObject Root;
+            public Image BgImage;
+            public Image ItemImage;
+        }
+
+        public void Initialize(
+            TidyUpLevelDefinition levelDefinition,
+            RectTransform tilesContainer,
+            RectTransform slotsContainer,
+            Button backButton,
+            TextMeshProUGUI titleLabel,
+            TextMeshProUGUI statusLabel,
+            Action onBack,
+            Action<bool> onLevelComplete)
         {
             _levelDefinition = levelDefinition;
             _tilesContainer = tilesContainer;
             _slotsContainer = slotsContainer;
             _backButton = backButton;
+            _titleLabel = titleLabel;
             _statusLabel = statusLabel;
             _onBack = onBack;
             _onLevelComplete = onLevelComplete;
 
             LoadSprites();
+            CalculateTileSize();
+            SetupHeader();
             SetupBoard();
             SetupSlots();
             SetupBackButton();
@@ -55,148 +86,41 @@ namespace HappyFamily.UI
                 {
                     _spriteCache[item.ItemId] = sprite;
                 }
-                else
-                {
-                    Debug.LogWarning($"Failed to load sprite: {item.SpritePath}");
-                }
             }
         }
 
-        private void SetupBoard()
+        private void CalculateTileSize()
         {
-            foreach (var obj in _tileObjects)
-            {
-                if (obj != null) Destroy(obj);
-            }
-            _tileObjects.Clear();
+            // 基于游戏区计算卡片尺寸
+            var tilesRect = _tilesContainer.rect;
+            var padding = 30f;
 
-            _board = TidyUpBoard.Create(_levelDefinition);
+            // 考虑层叠偏移
+            var layerOffsetTotal = 10f * Mathf.Max(0, _levelDefinition.MaxLayers - 1);
 
-            var containerRect = _tilesContainer.rect;
-            // Calculate tile size based on 3:4 aspect ratio (width:height)
-            var maxTileWidth = containerRect.width / (_levelDefinition.GridWidth + 0.5f);
-            var maxTileHeight = containerRect.height / (_levelDefinition.GridHeight + 0.5f);
-            // For 3:4 ratio, height = width * 4/3
-            var tileWidth = Mathf.Min(maxTileWidth, maxTileHeight * 0.75f, 100f);
-            var tileHeight = tileWidth * 4f / 3f;
+            var availableWidth = tilesRect.width - padding * 2 - layerOffsetTotal;
+            var availableHeight = tilesRect.height - padding * 2 - layerOffsetTotal;
 
-            var layerOffset = new Vector2(12f, -12f);
+            // 基于网格计算最大卡片尺寸
+            var maxTileWidth = availableWidth / _levelDefinition.GridWidth;
+            var maxTileHeight = availableHeight / _levelDefinition.GridHeight;
 
-            foreach (var tile in _board.Tiles)
-            {
-                var tileObj = CreateTileObject(tile, tileWidth, tileHeight, layerOffset);
-                _tileObjects.Add(tileObj);
-            }
+            // 保持宽高比，取能放下的尺寸
+            var widthFromHeight = maxTileHeight * TileAspectRatio;
 
-            UpdateTileVisuals();
+            _tileWidth = Mathf.Min(maxTileWidth, widthFromHeight);
+            _tileHeight = _tileWidth / TileAspectRatio;
+
+            // 设置合理的最小和最大值
+            _tileWidth = Mathf.Clamp(_tileWidth, 60f, 150f);
+            _tileHeight = _tileWidth / TileAspectRatio;
         }
 
-        private GameObject CreateTileObject(StackedTile tile, float tileWidth, float tileHeight, Vector2 layerOffset)
+        private void SetupHeader()
         {
-            var tileObj = new GameObject($"Tile_{tile.Index}");
-            tileObj.transform.SetParent(_tilesContainer, false);
-
-            var rectTransform = tileObj.AddComponent<RectTransform>();
-            var baseX = (tile.GridX - _levelDefinition.GridWidth / 2f + 0.5f) * tileWidth;
-            var baseY = (tile.GridY - _levelDefinition.GridHeight / 2f + 0.5f) * tileHeight;
-            var layerOffsetX = tile.Layer * layerOffset.x;
-            var layerOffsetY = tile.Layer * layerOffset.y;
-
-            rectTransform.anchoredPosition = new Vector2(baseX + layerOffsetX, baseY + layerOffsetY);
-            rectTransform.sizeDelta = new Vector2(tileWidth - 4f, tileHeight - 4f);
-
-            // Shadow for depth (behind the sprite)
-            var shadowObj = new GameObject("Shadow");
-            shadowObj.transform.SetParent(tileObj.transform, false);
-            var shadowRect = shadowObj.AddComponent<RectTransform>();
-            shadowRect.anchorMin = Vector2.zero;
-            shadowRect.anchorMax = Vector2.one;
-            shadowRect.offsetMin = new Vector2(4f, -4f);
-            shadowRect.offsetMax = new Vector2(6f, -2f);
-            var shadowImage = shadowObj.AddComponent<Image>();
-            shadowImage.color = new Color(0f, 0f, 0f, 0.2f + tile.Layer * 0.08f);
-
-            // Main image - either sprite or fallback background
-            var mainImage = tileObj.AddComponent<Image>();
-            if (_spriteCache.TryGetValue(tile.ItemId, out var sprite))
+            if (_titleLabel != null)
             {
-                mainImage.sprite = sprite;
-                mainImage.preserveAspect = true;
-                mainImage.color = Color.white;
-            }
-            else
-            {
-                // Fallback: light background with text
-                mainImage.color = new Color(0.95f, 0.93f, 0.9f, 1f);
-
-                var textObj = new GameObject("Label");
-                textObj.transform.SetParent(tileObj.transform, false);
-                var textRect = textObj.AddComponent<RectTransform>();
-                textRect.anchorMin = Vector2.zero;
-                textRect.anchorMax = Vector2.one;
-                textRect.offsetMin = Vector2.zero;
-                textRect.offsetMax = Vector2.zero;
-
-                var text = textObj.AddComponent<TextMeshProUGUI>();
-                text.text = tile.DisplayName;
-                text.fontSize = 16;
-                text.alignment = TextAlignmentOptions.Center;
-                text.color = Color.black;
-                text.font = HappyFamilyUiThemeProvider.GetResolvedPrimaryFont();
-            }
-
-            // Button for interaction
-            var button = tileObj.AddComponent<Button>();
-            button.targetGraphic = mainImage;
-            var capturedIndex = tile.Index;
-            button.onClick.AddListener(() => OnTileClicked(capturedIndex));
-
-            return tileObj;
-        }
-
-        private void SetupSlots()
-        {
-            foreach (var img in _slotImages)
-            {
-                if (img != null && img.transform.parent != null)
-                {
-                    Destroy(img.transform.parent.gameObject);
-                }
-            }
-            _slotImages.Clear();
-
-            // 3:4 ratio slots (width:height)
-            var slotWidth = 54f;
-            var slotHeight = 72f;
-            var spacing = 6f;
-            var totalWidth = TidyUpBoard.SlotCount * slotWidth + (TidyUpBoard.SlotCount - 1) * spacing;
-            var startX = -totalWidth / 2f + slotWidth / 2f;
-
-            for (var i = 0; i < TidyUpBoard.SlotCount; i++)
-            {
-                var slotObj = new GameObject($"Slot_{i}");
-                slotObj.transform.SetParent(_slotsContainer, false);
-
-                var rectTransform = slotObj.AddComponent<RectTransform>();
-                rectTransform.anchoredPosition = new Vector2(startX + i * (slotWidth + spacing), 0f);
-                rectTransform.sizeDelta = new Vector2(slotWidth, slotHeight);
-
-                var bgImage = slotObj.AddComponent<Image>();
-                bgImage.color = new Color(0.92f, 0.9f, 0.88f, 0.5f);
-
-                var itemObj = new GameObject("Item");
-                itemObj.transform.SetParent(slotObj.transform, false);
-                var itemRect = itemObj.AddComponent<RectTransform>();
-                itemRect.anchorMin = Vector2.zero;
-                itemRect.anchorMax = Vector2.one;
-                itemRect.offsetMin = new Vector2(2f, 2f);
-                itemRect.offsetMax = new Vector2(-2f, -2f);
-
-                var itemImage = itemObj.AddComponent<Image>();
-                itemImage.preserveAspect = true;
-                itemImage.enabled = false;
-
-                _slotImages.Add(itemImage);
+                _titleLabel.text = _levelDefinition.DisplayName;
             }
         }
 
@@ -209,6 +133,139 @@ namespace HappyFamily.UI
             }
         }
 
+        private void SetupBoard()
+        {
+            foreach (var view in _tileViews)
+            {
+                if (view.Root != null) Destroy(view.Root);
+            }
+            _tileViews.Clear();
+
+            _board = TidyUpBoard.Create(_levelDefinition);
+
+            // 层叠偏移
+            var layerOffset = new Vector2(8f, -8f);
+
+            // 排序tiles按层级
+            var sortedTiles = new List<StackedTile>(_board.Tiles);
+            sortedTiles.Sort((a, b) => a.Layer.CompareTo(b.Layer));
+
+            foreach (var tile in sortedTiles)
+            {
+                var view = CreateTileView(tile, layerOffset);
+                _tileViews.Add(view);
+            }
+
+            UpdateTileVisuals();
+        }
+
+        private TileView CreateTileView(StackedTile tile, Vector2 layerOffset)
+        {
+            var view = new TileView { TileIndex = tile.Index };
+
+            view.Root = new GameObject($"Tile_{tile.Index}");
+            view.Root.transform.SetParent(_tilesContainer, false);
+
+            var rectTransform = view.Root.AddComponent<RectTransform>();
+
+            // 计算网格中心位置
+            var gridCenterX = (_levelDefinition.GridWidth - 1) / 2f;
+            var gridCenterY = (_levelDefinition.GridHeight - 1) / 2f;
+            var baseX = (tile.GridX - gridCenterX) * _tileWidth;
+            var baseY = (tile.GridY - gridCenterY) * _tileHeight;
+
+            rectTransform.anchoredPosition = new Vector2(
+                baseX + tile.Layer * layerOffset.x,
+                baseY + tile.Layer * layerOffset.y
+            );
+            rectTransform.sizeDelta = new Vector2(_tileWidth - 2f, _tileHeight - 2f);
+
+            // 直接在Root上显示素材
+            view.SpriteImage = view.Root.AddComponent<Image>();
+            view.SpriteImage.preserveAspect = true;
+            view.SpriteImage.raycastTarget = true;
+
+            if (_spriteCache.TryGetValue(tile.ItemId, out var sprite))
+            {
+                view.SpriteImage.sprite = sprite;
+                view.SpriteImage.color = Color.white;
+            }
+            else
+            {
+                // 找不到素材时显示半透明占位
+                view.SpriteImage.sprite = null;
+                view.SpriteImage.color = new Color(0.7f, 0.68f, 0.65f, 0.5f);
+            }
+
+            // 按钮交互
+            view.Button = view.Root.AddComponent<Button>();
+            view.Button.targetGraphic = view.SpriteImage;
+            view.Button.transition = Selectable.Transition.None;
+
+            var capturedIndex = tile.Index;
+            view.Button.onClick.AddListener(() => OnTileClicked(capturedIndex));
+
+            return view;
+        }
+
+        private void SetupSlots()
+        {
+            foreach (var view in _slotViews)
+            {
+                if (view.Root != null) Destroy(view.Root);
+            }
+            _slotViews.Clear();
+
+            // 收纳栏的卡片尺寸：基于收纳栏宽度，确保7个能放下
+            var slotsRect = _slotsContainer.rect;
+            var slotSpacing = 4f;
+            var slotTileWidth = (slotsRect.width - 20f - slotSpacing * (TidyUpBoard.SlotCount - 1)) / TidyUpBoard.SlotCount;
+            var slotTileHeight = slotTileWidth / TileAspectRatio;
+
+            // 如果收纳栏高度不够，按高度缩放
+            var maxSlotHeight = slotsRect.height - 10f;
+            if (slotTileHeight > maxSlotHeight)
+            {
+                slotTileHeight = maxSlotHeight;
+                slotTileWidth = slotTileHeight * TileAspectRatio;
+            }
+
+            var totalWidth = TidyUpBoard.SlotCount * slotTileWidth + (TidyUpBoard.SlotCount - 1) * slotSpacing;
+            var startX = -totalWidth / 2f + slotTileWidth / 2f;
+
+            for (var i = 0; i < TidyUpBoard.SlotCount; i++)
+            {
+                var view = new SlotView();
+
+                view.Root = new GameObject($"Slot_{i}");
+                view.Root.transform.SetParent(_slotsContainer, false);
+
+                var rectTransform = view.Root.AddComponent<RectTransform>();
+                rectTransform.anchoredPosition = new Vector2(startX + i * (slotTileWidth + slotSpacing), 0f);
+                rectTransform.sizeDelta = new Vector2(slotTileWidth, slotTileHeight);
+
+                // 空槽位背景
+                view.BgImage = view.Root.AddComponent<Image>();
+                view.BgImage.color = new Color(0.82f, 0.80f, 0.76f, 0.4f);
+
+                // 物品图片（子对象）
+                var itemObj = new GameObject("Item");
+                itemObj.transform.SetParent(view.Root.transform, false);
+                var itemRect = itemObj.AddComponent<RectTransform>();
+                itemRect.anchorMin = Vector2.zero;
+                itemRect.anchorMax = Vector2.one;
+                itemRect.offsetMin = Vector2.zero;
+                itemRect.offsetMax = Vector2.zero;
+
+                view.ItemImage = itemObj.AddComponent<Image>();
+                view.ItemImage.preserveAspect = true;
+                view.ItemImage.raycastTarget = false;
+                view.ItemImage.enabled = false;
+
+                _slotViews.Add(view);
+            }
+        }
+
         private void OnTileClicked(int tileIndex)
         {
             if (_board == null) return;
@@ -218,37 +275,21 @@ namespace HappyFamily.UI
             switch (result.State)
             {
                 case TidyUpMoveState.None:
-                    ShowMessage("这个物品被压住了，先整理上面的");
                     break;
 
                 case TidyUpMoveState.Picked:
-                    UpdateTileVisuals();
-                    UpdateSlotVisuals();
-                    UpdateStatus();
-                    break;
-
                 case TidyUpMoveState.Matched:
+                case TidyUpMoveState.SlotsFull:
                     UpdateTileVisuals();
                     UpdateSlotVisuals();
-                    ShowMessage($"整理好了「{result.ItemName}」！");
                     UpdateStatus();
 
                     if (_board.IsCompleted)
                     {
-                        ShowMessage("全部整理完毕！太棒了！");
                         _onLevelComplete?.Invoke(true);
                     }
-                    break;
-
-                case TidyUpMoveState.SlotsFull:
-                    UpdateTileVisuals();
-                    UpdateSlotVisuals();
-                    ShowMessage("收纳栏满了！");
-                    UpdateStatus();
-
-                    if (_board.IsFailed)
+                    else if (_board.IsFailed)
                     {
-                        ShowMessage("空间不够了...再试一次吧");
                         _onLevelComplete?.Invoke(false);
                     }
                     break;
@@ -257,49 +298,50 @@ namespace HappyFamily.UI
 
         private void UpdateTileVisuals()
         {
-            for (var i = 0; i < _board.Tiles.Count && i < _tileObjects.Count; i++)
+            foreach (var view in _tileViews)
             {
-                var tile = _board.Tiles[i];
-                var tileObj = _tileObjects[i];
+                if (view.Root == null) continue;
 
-                if (tileObj == null) continue;
+                var tileIndex = view.TileIndex;
+                if (tileIndex < 0 || tileIndex >= _board.Tiles.Count) continue;
 
-                tileObj.SetActive(!tile.IsRemoved);
+                var tile = _board.Tiles[tileIndex];
 
-                var button = tileObj.GetComponent<Button>();
-                var mainImage = tileObj.GetComponent<Image>();
+                view.Root.SetActive(!tile.IsRemoved);
+                if (tile.IsRemoved) continue;
 
-                if (button != null && mainImage != null)
+                var canPick = _board.CanPickTile(tileIndex);
+                view.Button.interactable = canPick;
+
+                // 被遮挡的卡片显示半透明
+                if (view.SpriteImage != null)
                 {
-                    var canPick = _board.CanPickTile(i);
-                    button.interactable = canPick;
-
-                    // Dim blocked tiles by reducing alpha
-                    var currentColor = mainImage.color;
-                    mainImage.color = new Color(currentColor.r, currentColor.g, currentColor.b, canPick ? 1f : 0.5f);
+                    view.SpriteImage.color = canPick ? Color.white : new Color(0.6f, 0.6f, 0.6f, 0.7f);
                 }
             }
         }
 
         private void UpdateSlotVisuals()
         {
-            for (var i = 0; i < _board.Slots.Length && i < _slotImages.Count; i++)
+            for (var i = 0; i < _board.Slots.Length && i < _slotViews.Count; i++)
             {
                 var slot = _board.Slots[i];
-                var slotImage = _slotImages[i];
+                var view = _slotViews[i];
 
-                if (slotImage == null) continue;
+                if (view.ItemImage == null) continue;
 
                 if (slot.IsEmpty)
                 {
-                    slotImage.enabled = false;
+                    view.ItemImage.enabled = false;
+                    view.BgImage.color = new Color(0.82f, 0.80f, 0.76f, 0.4f);
                 }
                 else
                 {
-                    slotImage.enabled = true;
+                    view.ItemImage.enabled = true;
+                    view.BgImage.color = new Color(0.92f, 0.90f, 0.86f);
                     if (_spriteCache.TryGetValue(slot.ItemId, out var sprite))
                     {
-                        slotImage.sprite = sprite;
+                        view.ItemImage.sprite = sprite;
                     }
                 }
             }
@@ -315,44 +357,22 @@ namespace HappyFamily.UI
                 if (!tile.IsRemoved) remaining++;
             }
 
-            var slotsUsed = 0;
-            foreach (var slot in _board.Slots)
-            {
-                if (!slot.IsEmpty) slotsUsed++;
-            }
-
-            _statusLabel.text = $"剩余物品: {remaining}   收纳栏: {slotsUsed}/{TidyUpBoard.SlotCount}";
-        }
-
-        private void ShowMessage(string message)
-        {
-            Debug.Log($"[TidyUp] {message}");
-            // The status label can also show the message temporarily
-            if (_statusLabel != null)
-            {
-                var currentText = _statusLabel.text;
-                _statusLabel.text = message;
-                // Reset after a delay - using coroutine would be better but this is simpler
-                Invoke(nameof(UpdateStatus), 1.5f);
-            }
+            _statusLabel.text = $"剩余: {remaining}";
         }
 
         private void OnDestroy()
         {
-            foreach (var obj in _tileObjects)
+            foreach (var view in _tileViews)
             {
-                if (obj != null) Destroy(obj);
+                if (view.Root != null) Destroy(view.Root);
             }
-            _tileObjects.Clear();
+            _tileViews.Clear();
 
-            foreach (var img in _slotImages)
+            foreach (var view in _slotViews)
             {
-                if (img != null && img.transform.parent != null)
-                {
-                    Destroy(img.transform.parent.gameObject);
-                }
+                if (view.Root != null) Destroy(view.Root);
             }
-            _slotImages.Clear();
+            _slotViews.Clear();
         }
     }
 }
